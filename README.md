@@ -60,8 +60,21 @@ stay clean — no per-project files inside the repos themselves:
 # musex: sandboxed `muse --yolo` scoped to $PWD (one VM per directory); halts the sandbox when you quit
 musex() {
   local proj="$(basename "$PWD")"
-  local args=(--kit "$MUSE_KIT" muse --name "muse-$proj")
-  args+=("$PWD" "$HOME/.agents:ro")
+  local name="muse-$proj"
+  local args=()
+  if sbx ls -q 2>/dev/null | grep -qx "$name"; then
+    args=(--name "$name")
+  else
+    args=(--kit "$MUSE_KIT" muse --name "$name")
+    if [ -d "$HOME/.agents" ]; then
+      args+=("$PWD" "$HOME/.agents:ro")
+    else
+      args+=("$PWD")
+    fi
+  fi
+  if [ -d "$HOME/.agents" ]; then
+    args+=(-e "MUSEX_SKILLS_SRC=$HOME/.agents")
+  fi
   local tok
   tok="$(gh auth token 2>/dev/null)" && args+=(-e "GH_TOKEN=$tok")
   local conf="$HOME/.config/musex/$proj.sh"
@@ -69,7 +82,7 @@ musex() {
   sbx run "${args[@]}"
 
   echo "Stopping 'muse-$proj' sandbox..."
-  sbx stop "muse-$proj"
+  sbx stop "$name"
 }
 ```
 
@@ -79,12 +92,41 @@ args+=(-p 5173:5173 -p 4000:4000 -p 8080:8080 -p 9099:9099)
 ```
 
 `-p` applies only at sandbox creation; for an existing sandbox publish
-instead (no recreation needed, login survives):
+instead (no recreation needed, login survives). Publishing is only needed
+for host-to-sandbox traffic (a Mac browser viewing sandbox-hosted
+services): if you develop on the host and the sandbox only runs the agent
+and tests against sandbox-local services, omit `-p` entirely — each side's
+`127.0.0.1` is its own loopback and the two never conflict:
 
 ```console
 $ sbx ports muse-listita --publish 5173:5173 --publish 4000:4000 \
     --publish 8080:8080 --publish 9099:9099
 ```
+
+The `sbx ls -q` branch exists because sbx rejects workspace args on
+re-attach (`already exists and can't be given new workspaces`), so kit and
+workspaces are sent only at creation. `-e` flags are safe in both paths —
+they apply to the agent session even on re-attach.
+
+## User skills
+
+Muse resolves user skills via `$HOME` (`$HOME/.agents/skills`), but inside
+the sandbox `HOME` is `/home/agent` while the wrapper's read-only mount
+lands at the host absolute path (e.g. `/Users/gosukiwi/.agents`) — so the
+mount alone is invisible to Muse. A symlink doesn't work either: Muse
+resolves it outside `HOME` and rejects every skill (`list` shows them,
+`inspect`/`enable` say "skill not found"). The kit's `setup.startup` step
+therefore syncs real files — `cp -r "$MUSEX_SKILLS_SRC/skills/."` into
+`/home/agent/.agents/skills/` (clearing a stale symlink first, wiping
+removed skills); the wrapper passes `MUSEX_SKILLS_SRC` pointing at the
+mount. The kit stays generic (no host paths baked in), the host-specific
+path stays in the wrapper, and the copy is refreshed on every start, so it
+self-heals after sandbox recreation. Verified with
+`muse skills list --source user --enabled-only` from inside the sandbox.
+Treat the sandbox copy as a cache — manage skills on the host. (Project
+skills, e.g. `listita/.agents/skills`, are a separate scope — Muse skips
+them until the workspace is trusted; pass `--trust-workspace` for one
+run.)
 
 ## GitHub CLI
 

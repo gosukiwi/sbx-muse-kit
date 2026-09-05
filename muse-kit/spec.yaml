@@ -34,3 +34,7 @@ setup:
       description: Install Muse Code launcher
     - command: ln -sf /home/agent/.local/bin/muse /usr/local/bin/muse
       description: Link Muse Code onto PATH
+  startup:
+    - command: ["sh", "-c", "test -L /home/agent/.agents && rm /home/agent/.agents || true; test -n \"$MUSEX_SKILLS_SRC\" && test -d \"$MUSEX_SKILLS_SRC/skills\" && rm -rf /home/agent/.agents/skills && mkdir -p /home/agent/.agents/skills && cp -r \"$MUSEX_SKILLS_SRC/skills/.\" /home/agent/.agents/skills/ || true"]
+      user: "1000"
+      description: Sync host skills into HOME as real files so Muse finds user skills
