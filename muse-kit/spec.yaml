@@ -1,0 +1,32 @@
+schemaVersion: "2"
+kind: sandbox
+name: muse
+displayName: Muse Code
+description: Muse Code (Meta) running inside a Docker sandbox.
+sandbox:
+  image: docker/sandbox-templates:shell-docker
+  entrypoint:
+    - muse
+    - --yolo
+agentInstructions:
+  filename: AGENTS.md
+  content: |
+    ## Sandbox environment
+
+    You are running inside a Docker sandbox. The workspace is mounted at
+    its absolute host path. `sudo` is passwordless; use it for package
+    installs. Docker is available inside the sandbox; containers you start
+    are isolated in the microVM.
+permissions:
+  network:
+    allow:
+      - api.meta.ai:443
+      - auth.meta.com:443
+      - lookaside.facebook.com:443
+setup:
+  install:
+    - command: mkdir -p /home/agent/.local/bin && curl -fsSL https://api.meta.ai/muse-launcher.sh -o /home/agent/.local/bin/muse && chmod +x /home/agent/.local/bin/muse
+      user: "1000"
+      description: Install Muse Code launcher
+    - command: ln -sf /home/agent/.local/bin/muse /usr/local/bin/muse
+      description: Link Muse Code onto PATH
