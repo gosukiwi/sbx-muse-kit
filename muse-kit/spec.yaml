@@ -23,8 +23,12 @@ permissions:
       - api.meta.ai:443
       - auth.meta.com:443
       - lookaside.facebook.com:443
+      - github.com:443
+      - api.github.com:443
 setup:
   install:
+    - command: command -v gh >/dev/null || (apt-get update && apt-get install -y gh)
+      description: Install GitHub CLI (already present in current base image; no-op then)
     - command: mkdir -p /home/agent/.local/bin && curl -fsSL https://api.meta.ai/muse-launcher.sh -o /home/agent/.local/bin/muse && chmod +x /home/agent/.local/bin/muse
       user: "1000"
       description: Install Muse Code launcher

@@ -49,18 +49,61 @@ $ sbx run --name muse
 
 A wrapper in `~/.zshrc` avoids retyping the kit reference. It names the
 sandbox after the current directory (one VM per project) and stops it when
-you quit, so idle VMs don't hold resources:
+you quit, so idle VMs don't hold resources. Generic defaults every project
+gets (read-only `~/.agents` mount for user-level skills, `GH_TOKEN` from
+host auth) live in the wrapper; per-project flags live in
+`~/.config/musex/<project>.sh`, which the wrapper sources to append to
+`args` (e.g. `-p` publishes, extra mounts, `--env-file`). Project repos
+stay clean — no per-project files inside the repos themselves:
 
 ```bash
 # musex: sandboxed `muse --yolo` scoped to $PWD (one VM per directory); halts the sandbox when you quit
 musex() {
-  local name="muse-$(basename "$PWD")"
-  sbx run --kit "$MUSE_KIT" muse --name "$name"
+  local proj="$(basename "$PWD")"
+  local args=(--kit "$MUSE_KIT" muse --name "muse-$proj")
+  args+=("$PWD" "$HOME/.agents:ro")
+  local tok
+  tok="$(gh auth token 2>/dev/null)" && args+=(-e "GH_TOKEN=$tok")
+  local conf="$HOME/.config/musex/$proj.sh"
+  [ -f "$conf" ] && source "$conf"
+  sbx run "${args[@]}"
 
-  echo "Stopping '$name' sandbox..."
-  sbx stop "$name"
+  echo "Stopping 'muse-$proj' sandbox..."
+  sbx stop "muse-$proj"
 }
 ```
+
+```bash
+# ~/.config/musex/listita.sh (per-project)
+args+=(-p 5173:5173 -p 4000:4000 -p 8080:8080 -p 9099:9099)
+```
+
+`-p` applies only at sandbox creation; for an existing sandbox publish
+instead (no recreation needed, login survives):
+
+```console
+$ sbx ports muse-listita --publish 5173:5173 --publish 4000:4000 \
+    --publish 8080:8080 --publish 9099:9099
+```
+
+## GitHub CLI
+
+`gh` is installed at sandbox creation (no-op: the current base image
+already ships it) and the kit allow-lists `github.com:443` plus
+`api.github.com:443`, covering PR/issue ops and git-over-HTTPS. Two ways
+to authenticate:
+
+- Interactive per sandbox: `gh auth login` inside the sandbox.
+- Reuse the host's auth (token needs `repo` scope):
+
+```console
+$ sbx run --kit "$MUSE_KIT" muse --name muse-listita \
+    -e GH_TOKEN=$(gh auth token)
+```
+
+The `musex` wrapper above does the second form automatically. If `gh`
+hits a blocked host, run `sbx policy log muse-<proj>` to find it and
+extend `permissions.network.allow` in the kit.
 
 ## YOLO mode
 
@@ -78,8 +121,22 @@ removed — run args after `--` append, they can't unset a baked-in flag. Edit
 - Install step downloads the Muse launcher from `api.meta.ai`; first `muse`
   invocation fetches the Linux binary into the sandbox.
 - Network allow-list: `api.meta.ai`, `auth.meta.com`,
-  `lookaside.facebook.com` (all `:443`). If Muse hits a blocked host, watch
-  `sbx policy log` and extend `permissions.network.allow` in the kit.
+  `lookaside.facebook.com`, `github.com`, `api.github.com` (all `:443`).
+  If Muse hits a blocked host, watch `sbx policy log` and extend
+  `permissions.network.allow` in the kit.
+- Effective network policy is the union of kit allows and the global
+  local policy when no organization governance is active (verified
+  2026-09-05, sbx v0.39.0: `sbx policy init balanced` installs 193 global
+  allows across AI services, package managers, code/container hosts,
+  cloud infra, OS packages, and cert validation — that is why
+  `github.com`, `registry.npmjs.org`, `repo.maven.apache.org`, and
+  `storage.googleapis.com` are reachable from inside a sandbox even
+  though only the Meta hosts were in the kit; hosts in neither list,
+  e.g. `firebase-public.firebaseio.com`, are default-denied). Deny wins
+  on conflict. Kit `allow` entries are therefore explicitness for tighter
+  profiles, not what currently unblocks those hosts — make allow-list
+  edits with that assumption, and don't loosen or tighten either layer
+  as a drive-by.
 - Auth is interactive device flow per sandbox. Alternative: if you have a
   `META_API_KEY`, pass it with `sbx run --kit ./muse-kit muse -e META_API_KEY`.
 
