@@ -5,7 +5,10 @@ Muse Code is not a built-in `sbx` agent. This repo defines it as a
 [`muse-kit/spec.yaml`](muse-kit/spec.yaml).
 Verified with `sbx v0.39.0` on macOS arm64.
 
-Agents: read [AGENTS.md](AGENTS.md) before you change files in this repo.
+```
+$ cd my-repo
+$ musex # safely use `muse` in YOLO mode inside a Docker Sandbox
+```
 
 ## Prerequisites
 
