@@ -25,6 +25,7 @@ permissions:
       - lookaside.facebook.com:443
       - github.com:443
       - api.github.com:443
+      - cdn.playwright.dev:443
 setup:
   install:
     - command: command -v gh >/dev/null || (apt-get update && apt-get install -y gh)
