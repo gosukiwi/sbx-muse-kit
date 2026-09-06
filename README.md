@@ -27,11 +27,11 @@ export MUSE_KIT="git+https://github.com/gosukiwi/sbx-muse-kit.git#dir=muse-kit"
 ## Daily use
 
 Add this wrapper to `~/.zshrc` (or `~/.bashrc` if you use bash). It starts one
-sandbox per directory. It names the sandbox `muse-<directory>`. It stops the
-sandbox when you quit:
+sandbox per directory. It names the sandbox `muse-<directory>`. It leaves the
+sandbox running when you quit. Stop it by hand when you finish:
 
 ```bash
-# musex: sandboxed `muse --yolo` scoped to $PWD (one VM per directory); halts the sandbox when you quit
+# musex: sandboxed `muse --yolo` scoped to $PWD (one VM per directory)
 musex() {
   local proj="$(basename "$PWD")"
   local name="muse-$proj"
@@ -54,15 +54,12 @@ musex() {
   local conf="$HOME/.config/musex/$proj.sh"
   [ -f "$conf" ] && source "$conf"
   sbx run "${args[@]}"
-
-  echo "Stopping '$name' sandbox..."
-  sbx stop "$name"
 }
 ```
 
-Run `musex` from any project directory. The first run pulls the image and
-installs tools, and logs in. Each sandbox needs its own login. Only `sbx rm`
-deletes a sandbox and its login.
+Run `musex` from any project directory. The first run pulls the image.
+It installs tools. It logs in. Each sandbox needs its own login. Only `sbx rm`
+deletes a sandbox and its login. To stop a sandbox, run `sbx stop muse-<directory>`.
 
 ## Configuration: general and per-project
 
